@@ -1,192 +1,402 @@
+
 import os
 import json
 import requests
 from bs4 import BeautifulSoup
-from fpdf import FPDF
+import pdfkit
 import pandas as pd
 import urllib.parse
 import re
 
+
 # URL de la page Wikipédia pour Indiana Jones
+
 url_indiana_jones = "https://fr.wikipedia.org/wiki/Indiana_Jones"
+
 # URL pour les données de la population de l'Allemagne
+
 url_allemagne = "https://www.worldometers.info/world-population/germany-population/"
 
+
 # Création des répertoires de sortie
+
 os.makedirs("rendu PDF", exist_ok=True)
+
 os.makedirs("Images Indiana Jones", exist_ok=True)
+
 os.makedirs("rendu CSV", exist_ok=True)
 
-# --- 1. EXTRACTION DU SOMMAIRE DE LA PAGE WIKIPÉDIA INDY ---
+
+# --- 1. EXTRACTION DU SOMMAIRE DE LA PAGE WIKIPÉDIA ---
+
 def extract_toc():
+
     response_indiana_jones = requests.get(url_indiana_jones)
+
     soup_indiana_jones = BeautifulSoup(response_indiana_jones.content, 'html.parser')
 
-    # Look for the <ul> element with the class 'vector-toc-contents'
-    toc = soup_indiana_jones.find('ul', {'class': 'vector-toc-contents'})
-    
-    toc_text = "Sommaire de la page Indiana Jones\n\n"
 
-    if toc:
-        toc_items = toc.find_all('li')
-        for item in toc_items:
-            title = item.find('span', {'class': 'toctext'})
-            if title:
-                indent_level = item.get('class', [])
-                indent = "    " * (indent_level.count('toclevel-2') or 0)
-                toc_text += f"{indent}{title.text.strip()}\n"
+    # Recherche du conteneur principal du sommaire
+
+    toc_div = soup_indiana_jones.find("div", {"class": "vector-toc"})
+
+    toc_html = ""
+
+
+    if toc_div:
+
+        # Suppression des boutons de navigation (comme les boutons de déploiement et autres éléments inutiles)
+
+        for unwanted in toc_div.find_all(["button", "span"], {"class": ["toc-toggle", "vector-toc-expand", "vector-toc-collapse"]}):
+
+            unwanted.decompose()
+
+
+        # Récupérer le contenu HTML épuré du sommaire pour PDFKit
+
+        toc_html = f"""
+
+        <!DOCTYPE html>
+
+        <html lang="fr">
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <title>Sommaire de Indiana Jones</title>
+
+            <style>
+
+                body {{ font-family: Arial, sans-serif; }}
+
+                h1 {{ text-align: center; }}
+
+                ul {{ list-style: none; padding: 0; }}
+
+                li {{ margin-bottom: 8px; }}
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h1>Sommaire de la page Indiana Jones</h1>
+
+            {toc_div.prettify()}
+
+        </body>
+
+        </html>
+
+        """
+
     else:
-        toc_text += "Aucun sommaire trouvé.\n"
 
-    toc_text = toc_text.replace("[", "").replace("]", "")
-    return toc_text
+        # Fallback si le sommaire n'est pas trouvé
+
+        toc_html = """
+
+        <!DOCTYPE html>
+
+        <html lang="fr">
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <title>Sommaire de Indiana Jones</title>
+
+            <style>
+
+                body {{ font-family: Arial, sans-serif; }}
+
+                h1 {{ text-align: center; }}
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h1>Sommaire de la page Indiana Jones</h1>
+
+            <p>Aucun sommaire trouvé.</p>
+
+        </body>
+
+        </html>
+
+        """
 
 
-# Sauvegarde du sommaire dans un fichier PDF
-def save_toc_pdf(toc_text):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.set_left_margin(10)  # Ajustement de la marge gauche pour que le texte s'affiche correctement
+    return toc_html
 
-    # Ajout du titre du sommaire
-    pdf.cell(200, 10, txt="Sommaire de la page Indiana Jones", ln=True, align='C')
-    pdf.ln(10)  # Ajouter un espace avant le texte du sommaire
 
-    # Ajout du texte TOC dans le PDF
-    pdf.multi_cell(0, 10, toc_text)
-    pdf.output("rendu PDF/Sommaire Indiana Jones.pdf")
-    print("Sommaire enregistré dans 'rendu PDF/Sommaire Indiana Jones.pdf'")
+# Sauvegarde du sommaire dans un fichier PDF avec PDFKit
 
-# --- 2. TÉLÉCHARGEMENT DES IMAGES DE LA PAGE WIKIPÉDIA INDY ---
+def save_toc_pdf_with_pdfkit(toc_html):
+
+    output_file = "rendu PDF/Sommaire Indiana Jones.pdf"
+
+
+    # Options pour PDFKit
+
+    options = {
+
+        "encoding": "UTF-8",  # Assurer un encodage correct
+
+        "enable-local-file-access": None  # Autorise l'accès local pour inclure des fichiers CSS ou JS
+
+    }
+
+
+    # Conversion de la chaîne HTML en PDF
+
+    pdfkit.from_string(toc_html, output_file, options=options)
+
+    print(f"Sommaire enregistré dans {output_file}")
+
+
+# --- 2. TÉLÉCHARGEMENT DES IMAGES DE LA PAGE WIKIPÉDIA ---
+
 def download_images():
+
     response_indiana_jones = requests.get(url_indiana_jones)
+
     soup_indiana_jones = BeautifulSoup(response_indiana_jones.content, 'html.parser')
+
 
     img_tags = soup_indiana_jones.find_all('img')
+
     output_dir = "Images Indiana Jones"
+
     downloaded_images = []
 
+
     for index, img in enumerate(img_tags):
+
         img_url = img.get('src')
+
         if img_url and img_url.startswith('/'):
+
             img_url = urllib.parse.urljoin('https://fr.wikipedia.org', img_url)
 
+
         try:
+
             img_data = requests.get(img_url).content
+
             img_name = f"image_{index}.jpg"
+
             img_name = re.sub(r'[^\w\s.-]', '', img_name)
 
+
             if img_url not in downloaded_images:
+
                 with open(os.path.join(output_dir, img_name), 'wb') as f:
+
                     f.write(img_data)
+
                 downloaded_images.append(img_url)
+
                 print(f"Image sauvegardée : {os.path.join(output_dir, img_name)}")
+
         except Exception as e:
+
             print(f"Erreur lors de l'enregistrement de l'image {img_url}: {e}")
+
 
     print("Toutes les images ont été traitées.")
 
+
 # --- 3. EXTRACTION DES JEUX VIDÉO ET SAUVEGARDE EN JSON & EXCEL ---
+
 def extract_video_games():
+
     response_indiana_jones = requests.get(url_indiana_jones)
+
     soup_indiana_jones = BeautifulSoup(response_indiana_jones.content, 'html.parser')
 
+
     games = []
+
     ul_elements = soup_indiana_jones.find_all('ul')
 
+
     for ul in ul_elements:
+
         for li in ul.find_all('li'):
+
             year_tag = li.find('a', href=re.compile(r"(\d{4})_en_jeu_vid%C3%A9o"))
+
             title_tag = li.find('i')
 
+
             if year_tag and title_tag:
+
                 year = year_tag.text.strip()
+
                 title = title_tag.text.strip()
+
                 description = li.get_text(strip=True)
+
                 description = description.replace(year, "").replace(title, "").strip(" –:")
 
+
                 games.append({
+
                     "Date": year,
+
                     "Titre": title,
+
                     "Description": description
+
                 })
+
 
     # Sauvegarde des jeux vidéo en JSON
+
     json_file_path = "rendu PDF/Jeux Indiana Jones.json"
+
     with open(json_file_path, "w", encoding="utf-8") as json_file:
+
         json.dump(games, json_file, ensure_ascii=False, indent=4)
+
     print(f"Liste des jeux vidéo sauvegardée en JSON : {json_file_path}")
 
+
     # Création du DataFrame et sauvegarde des jeux vidéo dans un fichier Excel
+
     df = pd.DataFrame(games)
+
     excel_file_path = "rendu PDF/Jeux Indiana Jones.xlsx"
+
     df.to_excel(excel_file_path, index=False)
+
     print(f"Liste des jeux vidéo sauvegardée en Excel : {excel_file_path}")
 
-# --- 4. EXTRACTION DES DONNÉES DE POPULATION DE L'ALLEMAGNE --- 
+
+# --- 4. EXTRACTION DES DONNÉES DE POPULATION DE L'ALLEMAGNE ---
+
 def extract_population_data():
+
     response_allemagne = requests.get(url_allemagne)
+
     soup_allemagne = BeautifulSoup(response_allemagne.content, 'html.parser')
 
+
     table = soup_allemagne.find('table', {'class': 'table table-striped table-bordered table-hover table-condensed table-list'})
+
     population_data = []
 
+
     if table:
+
         rows = table.find_all('tr')[1:6]
 
+
         for row in rows:
+
             cols = row.find_all('td')
+
             if len(cols) >= 6:
+
                 year = int(cols[0].text.strip())
+
                 population = cols[1].text.strip() + " habitants"
+
                 migrants = cols[4].text.strip() + " migrants"
+
                 avg_age = cols[5].text.strip() + " ans"
 
+
                 try:
+
                     rank = float(cols[6].text.strip())
+
                 except ValueError:
+
                     rank = None
 
+
                 population_data.append({
+
                     "Année": year,
+
                     "Population Totale": population,
+
                     "Migrants": migrants,
+
                     "Âge Moyen": avg_age,
+
                     "Rang": rank
+
                 })
+
 
     return population_data
 
+
 # Sauvegarde des données de population en CSV
+
 def save_population_csv(population_data):
+
     csv_file_path = "rendu CSV/Allemagne.csv"
+
     df_population = pd.DataFrame(population_data)
+
     df_population.to_csv(csv_file_path, index=False, encoding="utf-8")
+
     print(f"Les données de la population de l'Allemagne ont été enregistrées dans {csv_file_path}")
 
-# --- MAIN --- 
+
+# --- MAIN ---
+
 def main():
+
     # 1. Extraire le sommaire et le convertir en PDF
-    toc_text = extract_toc()
-    save_toc_pdf(toc_text)
+
+    toc_html = extract_toc()
+
+    save_toc_pdf_with_pdfkit(toc_html)
+
 
     # 2. Télécharger les images
+
     download_images()
 
+
     # 3. Extraire les jeux vidéo et sauvegarder en JSON et Excel
+
     extract_video_games()
 
+
     # 4. Extraire les données de population et sauvegarder en CSV
+
     population_data = extract_population_data()
+
     save_population_csv(population_data)
 
+
 # Lancer le script
+
 if __name__ == "__main__":
+
     main()
 
+
 print("\nTâches terminées :")
+
 print("- Sommaire enregistré dans 'rendu PDF/Sommaire Indiana Jones.pdf'") 
-print("- Images enregistrées dans le dossier 'Images Indiana Jones'")
-print("- Liste des jeux vidéo enregistrée en JSON et Excel dans 'rendu PDF/'")
+
+print("- Images enregistrées dans le dossier 'Images Indiana Jones'") 
+
+print("- Liste des jeux vidéo enregistrée en JSON et Excel dans 'rendu PDF/'") 
+
 print("- Données de la population de l'Allemagne enregistrées dans 'rendu CSV/Allemagne.csv'")
+ 
+
+
+
