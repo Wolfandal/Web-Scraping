@@ -22,28 +22,37 @@ def extract_toc():
     response_indiana_jones = requests.get(url_indiana_jones)
     soup_indiana_jones = BeautifulSoup(response_indiana_jones.content, 'html.parser')
 
-    toc = soup_indiana_jones.find('div', {'id': 'vector-toc'})
+    # Look for the <ul> element with the class 'vector-toc-contents'
+    toc = soup_indiana_jones.find('ul', {'class': 'vector-toc-contents'})
+    
     toc_text = "Sommaire de la page Indiana Jones\n\n"
 
     if toc:
-        toc_items = toc.find_all('li', {'class': 'toclevel-1'})
+        toc_items = toc.find_all('li')
         for item in toc_items:
-            # Trouver le numéro et le titre
-            number = item.find('span', {'class': 'tocnumber'}).text if item.find('span', {'class': 'tocnumber'}) else ""
-            title = item.find('span', {'class': 'toctext'}).text if item.find('span', {'class': 'toctext'}) else ""
-            toc_text += f"{number} {title}\n"
+            title = item.find('span', {'class': 'toctext'})
+            if title:
+                indent_level = item.get('class', [])
+                indent = "    " * (indent_level.count('toclevel-2') or 0)
+                toc_text += f"{indent}{title.text.strip()}\n"
     else:
         toc_text += "Aucun sommaire trouvé.\n"
 
     toc_text = toc_text.replace("[", "").replace("]", "")
     return toc_text
 
+
 # Sauvegarde du sommaire dans un fichier PDF
 def save_toc_pdf(toc_text):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    
+    pdf.set_left_margin(10)  # Ajustement de la marge gauche pour que le texte s'affiche correctement
+
+    # Ajout du titre du sommaire
+    pdf.cell(200, 10, txt="Sommaire de la page Indiana Jones", ln=True, align='C')
+    pdf.ln(10)  # Ajouter un espace avant le texte du sommaire
+
     # Ajout du texte TOC dans le PDF
     pdf.multi_cell(0, 10, toc_text)
     pdf.output("rendu PDF/Sommaire Indiana Jones.pdf")
@@ -177,7 +186,7 @@ if __name__ == "__main__":
     main()
 
 print("\nTâches terminées :")
-print("- Sommaire enregistré dans 'rendu PDF/Sommaire Indiana Jones.pdf'")
+print("- Sommaire enregistré dans 'rendu PDF/Sommaire Indiana Jones.pdf'") 
 print("- Images enregistrées dans le dossier 'Images Indiana Jones'")
 print("- Liste des jeux vidéo enregistrée en JSON et Excel dans 'rendu PDF/'")
 print("- Données de la population de l'Allemagne enregistrées dans 'rendu CSV/Allemagne.csv'")
