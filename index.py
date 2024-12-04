@@ -7,6 +7,9 @@ import pandas as pd
 import urllib.parse
 import re
 
+
+
+
 # URL des pages
 url_indiana_jones = "https://fr.wikipedia.org/wiki/Indiana_Jones"
 url_allemagne = "https://www.worldometers.info/world-population/germany-population/"
@@ -15,6 +18,11 @@ url_allemagne = "https://www.worldometers.info/world-population/germany-populati
 os.makedirs("rendu PDF", exist_ok=True)
 os.makedirs("Images Indiana Jones", exist_ok=True)
 os.makedirs("rendu CSV", exist_ok=True)
+
+
+
+
+
 
 # --- 1. EXTRACTION DU SOMMAIRE DE LA PAGE WIKIPÉDIA ---
 def extract_toc():
@@ -64,11 +72,20 @@ def extract_toc():
         """
     return toc_html
 
+
+
 def save_toc_pdf_with_pdfkit(toc_html):
     output_file = "rendu PDF/Sommaire Indiana Jones.pdf"
     options = {"encoding": "UTF-8", "enable-local-file-access": None}
     pdfkit.from_string(toc_html, output_file, options=options)
     print(f"Sommaire enregistré dans {output_file}")
+    
+    
+    
+    
+    
+    
+    
 
 # --- 2. TÉLÉCHARGEMENT DES IMAGES DE LA PAGE WIKIPÉDIA ---
 def download_images():
@@ -93,6 +110,12 @@ def download_images():
         except Exception as e:
             print(f"Erreur lors de l'enregistrement de l'image {img_url}: {e}")
     print("Toutes les images ont été traitées.")
+    
+    
+    
+    
+    
+    
 
 # --- 3. EXTRACTION DES JEUX VIDÉO ET SAUVEGARDE EN JSON & EXCEL ---
 def extract_video_games():
@@ -118,6 +141,12 @@ def extract_video_games():
     excel_file_path = "rendu PDF/Jeux Indiana Jones.xlsx"
     df.to_excel(excel_file_path, index=False)
     print(f"Liste des jeux vidéo sauvegardée en Excel : {excel_file_path}")
+    
+    
+    
+    
+    
+    
 
 # --- 4. EXTRACTION DES DONNÉES DE POPULATION DE L'ALLEMAGNE ---
 def extract_population_data():
@@ -141,11 +170,17 @@ def extract_population_data():
                 population_data.append({"Année": year, "Population Totale": population, "Migrants": migrants, "Âge Moyen": avg_age, "Rang": rank})
     return population_data
 
+
+
 def save_population_csv(population_data):
     csv_file_path = "rendu CSV/Allemagne.csv"
     df_population = pd.DataFrame(population_data)
     df_population.to_csv(csv_file_path, index=False, encoding="utf-8")
     print(f"Les données de la population de l'Allemagne ont été enregistrées dans {csv_file_path}")
+
+
+
+
 
 # --- MAIN ---
 def main():
@@ -158,6 +193,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
 
 print("\nTâches terminées :")
 print("- Sommaire enregistré dans 'rendu PDF/Sommaire Indiana Jones.pdf'")
